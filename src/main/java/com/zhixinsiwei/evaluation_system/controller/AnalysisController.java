@@ -34,7 +34,7 @@ public class AnalysisController {
     @PostMapping("/submitAnalysis")
     public ApiResponse submitAnalysis(@RequestBody SubmitAnalysisRequestParm submitAnalysisRequestParm, HttpSession session) {
         String userId = (String) session.getAttribute("uid");
-        analysisService.submitAnalysis(userId, submitAnalysisRequestParm.getPaperId(), submitAnalysisRequestParm.getAnswerDetails(), submitAnalysisRequestParm.getAge());
+        analysisService.submitAnalysis(userId, submitAnalysisRequestParm.getPaperId(), submitAnalysisRequestParm.getAnswerDetails(), submitAnalysisRequestParm.getAge(), submitAnalysisRequestParm.getElapsedTime());
         return ApiResponse.success(null);
     }
 

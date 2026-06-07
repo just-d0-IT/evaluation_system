@@ -57,12 +57,13 @@ public class AnalysisServiceImpl implements AnalysisService {
     private ThreadPoolExecutor reportExecutor;
 
     @Override
-    public void submitAnalysis(String userId, String paperId, String answerDetails, Integer age) {
+    public void submitAnalysis(String userId, String paperId, String answerDetails, Integer age, Integer elapsedTime) {
         // 存入正式表
         EvaluationRecords record = new EvaluationRecords();
         record.setUserId(userId);
         record.setPaperId(paperId);
         record.setAnswerDetails(answerDetails);
+        record.setElapsedTime(elapsedTime);
         record.setPayPrice(0.01);
         recordService.save(record);
 

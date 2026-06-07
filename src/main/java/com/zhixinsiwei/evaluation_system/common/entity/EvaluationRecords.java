@@ -45,4 +45,9 @@ public class EvaluationRecords extends BaseEntity {
      * 回答详情
      */
     private String answerDetails;
+
+    /**
+     * 总耗时（秒）
+     */
+    private Integer elapsedTime;
 }

@@ -24,4 +24,10 @@ public class SubmitAnalysisRequestParm extends UserEvaluationRequestParam {
      */
     @ApiModelProperty(dataType = "Integer", required = true, value = "年龄")
     private Integer age;
+
+    /**
+     * 总耗时（秒）
+     */
+    @ApiModelProperty(dataType = "Integer", required = false, value = "总耗时（秒）")
+    private Integer elapsedTime;
 }

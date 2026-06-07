@@ -3,11 +3,7 @@ package com.zhixinsiwei.evaluation_system.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.xiaoymin.knife4j.annotations.ApiOperationSupport;
-import com.wechat.pay.java.core.exception.ValidationException;
-import com.wechat.pay.java.core.notification.NotificationParser;
-import com.wechat.pay.java.service.partnerpayments.jsapi.model.Transaction;
 import com.zhixinsiwei.evaluation_system.common.ApiResponse;
-import com.zhixinsiwei.evaluation_system.config.WXPayConfig;
 import com.zhixinsiwei.evaluation_system.service.PaymentService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -39,9 +35,6 @@ public class PaymentController {
 
     @Resource
     private PaymentService paymentService;
-
-    @Resource
-    private WXPayConfig wxPayConfig;
 
     private final String appId = "wxc33bca5ecd103de2"; // 替换为微信公众号的 appId
     private final String appSecret = "dfcc02e41d368218e3d512ef36a72593"; // 替换为微信公众号的 appSecret
@@ -93,59 +86,22 @@ public class PaymentController {
     }
 
     @PostMapping("/notify")
-    public ResponseEntity.BodyBuilder callBack(@RequestBody String body, HttpServletRequest request) {
-        log.info("=========微信支付异步回调开始========");
-        try {
-            // 构造 RequestParam
-            com.wechat.pay.java.core.notification.RequestParam requestParam = new com.wechat.pay.java.core.notification.RequestParam.Builder()
-                    // 序列号
-                    .serialNumber(request.getHeader("Wechatpay-Serial"))
-                    // 随机数
-                    .nonce(request.getHeader("Wechatpay-Nonce"))
-                    // 签名
-                    .signature(request.getHeader("Wechatpay-Signature"))
-                    // 时间戳
-                    .timestamp(request.getHeader("Wechatpay-Timestamp"))
-                    .body(body)
-                    .build();
-            // 初始化解析器
-            NotificationParser parser = new NotificationParser(wxPayConfig.getConfig());
-            // 验签、解密并转换成 Transaction
-            Transaction transaction = parser.parse(requestParam, Transaction.class);
-            // 校验交易状态
-            if (Transaction.TradeStateEnum.SUCCESS.equals(transaction.getTradeState())) {
-                // 支付成功，根据订单编号查询订单信息
-                // 1.查询订单信息
-                //Order orderOld = orderService.selectForUpdateByOrderNumber(transaction.getOutTradeNo());
-                //// 校验金额
-                //if (orderOld != null && orderOld.getPayAmount().equals(transaction.getAmount().getTotal())) {
-                //    // 金额相等 完成支付 更新订单状态
-                //    WechatPayUtil.success(orderOld,transaction);
-                //} else {
-                //    // 金额异常 执行退款
-                //    WechatPayUtil.refunded(new WechatPayRedis(transaction.getOutTradeNo(), transaction.getAmount().getTotal(), null));
-                //}
-            }
-            log.info("transaction is {}", transaction);
-            try {
-                // 支付成功后业务处理
-                //productOrderService.callBack(no, outNo, tradeStatus, successTime);
-            } catch (Exception e) {
-                log.error("=========微信支付回调业务处理异常===>", e);
-            }
-        } catch (ValidationException exception) {
-            // 签名验证失败，返回 401 UNAUTHORIZED 状态码
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED);
+    public ResponseEntity<?> callBack(@RequestBody String body, HttpServletRequest request) {
+        int result = paymentService.handleNotify(
+                body,
+                request.getHeader("Wechatpay-Serial"),
+                request.getHeader("Wechatpay-Nonce"),
+                request.getHeader("Wechatpay-Signature"),
+                request.getHeader("Wechatpay-Timestamp")
+        );
+        switch (result) {
+            case 1:
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            case 2:
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            default:
+                return ResponseEntity.ok().build();
         }
-
-        // 如果处理失败，应返回 4xx/5xx 的状态码，例如 500 INTERNAL_SERVER_ERROR
-        //if (/* process error */) {
-        //    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR);
-        //}
-
-        log.info("=========微信支付异步回调结束========");
-        return ResponseEntity.ok();
-
     }
 
     @ApiOperation(value = "微信支付")

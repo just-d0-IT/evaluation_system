@@ -15,7 +15,7 @@ import java.util.List;
  */
 public interface AnalysisService {
 
-    void submitAnalysis(String userId, String paperId, String answerDetails, Integer age);
+    void submitAnalysis(String userId, String paperId, String answerDetails, Integer age, Integer elapsedTime);
 
     List<EvaluationRecords> listAnalysisResult(HttpSession session);
 
