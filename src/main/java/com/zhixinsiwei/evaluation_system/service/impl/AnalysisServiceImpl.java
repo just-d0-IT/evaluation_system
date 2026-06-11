@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -57,7 +58,7 @@ public class AnalysisServiceImpl implements AnalysisService {
     private ThreadPoolExecutor reportExecutor;
 
     @Override
-    public void submitAnalysis(String userId, String paperId, String answerDetails, Integer age, Integer elapsedTime) {
+    public String submitAnalysis(String userId, String paperId, String answerDetails, Integer age, Integer elapsedTime) {
         // 存入正式表
         EvaluationRecords record = new EvaluationRecords();
         record.setUserId(userId);
@@ -66,6 +67,7 @@ public class AnalysisServiceImpl implements AnalysisService {
         record.setElapsedTime(elapsedTime);
         record.setPayPrice(0.01);
         recordService.save(record);
+        String recordId = record.getId();
 
         // 软删除临时数据
         answerTempService.remove(new LambdaUpdateWrapper<EvaluationAnswersTemp>()
@@ -99,7 +101,6 @@ public class AnalysisServiceImpl implements AnalysisService {
                                         },
                                         (oldVal, newVal) -> newVal
                                 ));
-                String recordId = record.getId();
                 String fileName = "/data/report/" + recordId + ".html";
                 // String fileName = "D:/" + recordId + ".html";
                 // 生成报告
@@ -112,6 +113,7 @@ public class AnalysisServiceImpl implements AnalysisService {
                 log.error("generate report failed...", exception);
             }
         });
+        return recordId;
     }
 
     @Override
@@ -119,6 +121,26 @@ public class AnalysisServiceImpl implements AnalysisService {
         String userId = (String) session.getAttribute("uid");
         return recordService.list(new LambdaUpdateWrapper<EvaluationRecords>()
                 .eq(EvaluationRecords::getUserId, userId));
+    }
+
+    @Override
+    public Map<String, Object> getAnalysisRecord(String recordId, HttpSession session) {
+        String userId = (String) session.getAttribute("uid");
+        EvaluationRecords record = recordService.getById(recordId);
+        if (record == null) {
+            throw new RuntimeException("记录不存在");
+        }
+        if (!record.getUserId().equals(userId)) {
+            throw new RuntimeException("无权访问该记录");
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", record.getId());
+        result.put("paperId", record.getPaperId());
+        result.put("report", record.getReport());
+        result.put("payStatus", record.getPayStatus());
+        result.put("payPrice", record.getPayPrice());
+        result.put("elapsedTime", record.getElapsedTime());
+        return result;
     }
 
     @Override

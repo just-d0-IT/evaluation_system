@@ -20,6 +20,7 @@ import com.zhixinsiwei.evaluation_system.service.PaymentService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
@@ -85,7 +86,25 @@ public class PaymentServiceImpl implements PaymentService {
         String userId = (String) session.getAttribute("uid");
         EvaluationUsers user = userEntityService.getById(userId);
         EvaluationRecords record = recordService.getById(recordId);
-        log.info("user is {},record is {}", user.toString(), record.toString());
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!StringUtils.hasText(user.getUserKey())) {
+            throw new RuntimeException("用户未完成微信授权");
+        }
+        if (record == null) {
+            throw new RuntimeException("记录不存在");
+        }
+        if (!record.getUserId().equals(userId)) {
+            throw new RuntimeException("无权支付该记录");
+        }
+        if (!StringUtils.hasText(record.getReport())) {
+            throw new RuntimeException("报告分析中，请稍后支付");
+        }
+        if (record.getPayStatus() != null && record.getPayStatus() == 1) {
+            throw new RuntimeException("报告已支付");
+        }
+        log.info("user is {},record is {}", user, record);
         PrepayRequest request = new PrepayRequest();
         Amount amount = new Amount();
         BigDecimal moneyNumber = new BigDecimal(record.getPayPrice());

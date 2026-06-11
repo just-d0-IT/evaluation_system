@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author ovo
@@ -34,8 +36,10 @@ public class AnalysisController {
     @PostMapping("/submitAnalysis")
     public ApiResponse submitAnalysis(@RequestBody SubmitAnalysisRequestParm submitAnalysisRequestParm, HttpSession session) {
         String userId = (String) session.getAttribute("uid");
-        analysisService.submitAnalysis(userId, submitAnalysisRequestParm.getPaperId(), submitAnalysisRequestParm.getAnswerDetails(), submitAnalysisRequestParm.getAge(), submitAnalysisRequestParm.getElapsedTime());
-        return ApiResponse.success(null);
+        String recordId = analysisService.submitAnalysis(userId, submitAnalysisRequestParm.getPaperId(), submitAnalysisRequestParm.getAnswerDetails(), submitAnalysisRequestParm.getAge(), submitAnalysisRequestParm.getElapsedTime());
+        Map<String, Object> result = new HashMap<>();
+        result.put("recordId", recordId);
+        return ApiResponse.success(result);
     }
 
     @ApiOperation(value = "获取分析结果列表")
@@ -43,6 +47,13 @@ public class AnalysisController {
     @GetMapping("/listAnalysisResult")
     public ApiResponse listAnalysisResult(HttpSession session) {
         return ApiResponse.success(analysisService.listAnalysisResult(session));
+    }
+
+    @ApiOperation(value = "获取分析记录")
+    @ApiOperationSupport(author = "ovo")
+    @GetMapping("/record/{recordId}")
+    public ApiResponse getAnalysisRecord(@PathVariable String recordId, HttpSession session) {
+        return ApiResponse.success(analysisService.getAnalysisRecord(recordId, session));
     }
 
     @ApiOperation(value = "查看报告")
