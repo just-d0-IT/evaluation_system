@@ -104,7 +104,7 @@ public class AnalysisServiceImpl implements AnalysisService {
                 String fileName = "/data/report/" + recordId + ".html";
                 // String fileName = "D:/" + recordId + ".html";
                 // 生成报告
-                RuiWenIQCalculatorUtil.generateReport(age, answerDetails, questionDetailMap, fileName);
+                RuiWenIQCalculatorUtil.generateReport(age, answerDetails, questionDetailMap, fileName, elapsedTime);
                 // 更新记录
                 recordService.update(new LambdaUpdateWrapper<EvaluationRecords>()
                         .eq(EvaluationRecords::getId, recordId)

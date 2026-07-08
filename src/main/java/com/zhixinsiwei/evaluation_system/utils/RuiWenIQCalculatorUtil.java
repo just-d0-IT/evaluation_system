@@ -294,7 +294,7 @@ public class RuiWenIQCalculatorUtil {
     }
 
 
-    public static void generateReport(int age, String answerDetailsJson, Map<Integer, QuestionDetail> questionDetailMap, String fileName) throws Exception {
+    public static void generateReport(int age, String answerDetailsJson, Map<Integer, QuestionDetail> questionDetailMap, String fileName, Integer elapsedTime) throws Exception {
 
 
         // Thymeleaf config
@@ -310,8 +310,7 @@ public class RuiWenIQCalculatorUtil {
         IQResult iqResult = calculate(age, totalScore);
 
         // 3. 错题
-        List<Map<String, Object>> wrongList =
-                buildWrongList(userAnswers, questionDetailMap);
+        List<Map<String, Object>> wrongList = buildWrongList(userAnswers, questionDetailMap);
 
         // ===== 雷达图 =====
         List<String> radarLabels = new ArrayList<>();
@@ -340,6 +339,8 @@ public class RuiWenIQCalculatorUtil {
         }
 
         // ===== Thymeleaf =====
+        resolver.setPrefix("/templates/");
+        resolver.setSuffix(".html");
         resolver.setTemplateMode("HTML");
         resolver.setCharacterEncoding("UTF-8");
 
@@ -349,7 +350,31 @@ public class RuiWenIQCalculatorUtil {
         Context ctx = new Context();
         ctx.setVariable("age", age);
         ctx.setVariable("testDate", new java.text.SimpleDateFormat("yyyy-MM-dd").format(new Date()));
-        ctx.setVariable("score", totalScore);
+
+        // 答对题数（独立统计用户答案与正确答案匹配数）
+        int correctCount = 0;
+        for (Map.Entry<Integer, String> entry : CORRECT_ANSWER_MAP.entrySet()) {
+            String userAnswer = userAnswers.get(entry.getKey());
+            if (userAnswer != null && userAnswer.equals(entry.getValue())) {
+                correctCount++;
+            }
+        }
+        ctx.setVariable("correctCount", correctCount);
+
+        // 答题耗时格式化
+        String elapsedTimeStr = "--";
+        if (elapsedTime != null && elapsedTime > 0) {
+            int minutes = elapsedTime / 60;
+            int seconds = elapsedTime % 60;
+            if (minutes > 0) {
+                elapsedTimeStr = minutes + "分" + seconds + "秒";
+            } else {
+                elapsedTimeStr = seconds + "秒";
+            }
+        }
+        ctx.setVariable("elapsedTime", elapsedTimeStr);
+
+        ctx.setVariable("score", iqResult.getIq());
         ctx.setVariable("iqDesc", iqResult.getDesc());
         ctx.setVariable("percentile", iqResult.getPercentile());
         ctx.setVariable("result", iqResult.getEval());
@@ -358,6 +383,9 @@ public class RuiWenIQCalculatorUtil {
         ctx.setVariable("radarValues", radarValues);
         ctx.setVariable("wrongList", wrongList);
         ctx.setVariable("dimensionList", dimensionList);
+        // 图表图片：使用网络图片路径
+        ctx.setVariable("iqDistributionImg", "http://jia.szzxsw.cn/images/iq_distribution.png");
+        ctx.setVariable("iqAgeChartImg", "http://jia.szzxsw.cn/images/iq_age_chart.jpg");
 
         String html = engine.process("RuiWenReport", ctx);
 
@@ -390,7 +418,7 @@ public class RuiWenIQCalculatorUtil {
         Map<Integer, QuestionDetail> questionMap = buildAllQuestionDetails();
 
         // ===== 生成报告 =====
-        generateReport(age, answerDetailsJson, questionMap, "D:/raven_report.html");
+        generateReport(age, answerDetailsJson, questionMap, "D:/raven_report.html", 1200);
 
         System.out.println("报告生成完成：D:/raven_report.html");
     }
