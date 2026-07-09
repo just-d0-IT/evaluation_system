@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhixinsiwei.evaluation_system.common.entity.EvaluationAnswersTemp;
+import com.zhixinsiwei.evaluation_system.common.entity.EvaluationPapers;
 import com.zhixinsiwei.evaluation_system.common.entity.EvaluationQuestions;
 import com.zhixinsiwei.evaluation_system.common.entity.EvaluationRecords;
 import com.zhixinsiwei.evaluation_system.mybatis_plus.service.*;
@@ -59,13 +60,19 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     @Override
     public String submitAnalysis(String userId, String paperId, String answerDetails, Integer age, Integer elapsedTime) {
+        // 根据 paperId 查询试卷金额
+        EvaluationPapers paper = paperService.getById(paperId);
+        if (paper == null) {
+            throw new RuntimeException("试卷不存在");
+        }
+
         // 存入正式表
         EvaluationRecords record = new EvaluationRecords();
         record.setUserId(userId);
         record.setPaperId(paperId);
         record.setAnswerDetails(answerDetails);
         record.setElapsedTime(elapsedTime);
-        record.setPayPrice(0.01);
+        record.setPayPrice(paper.getPrice());
         recordService.save(record);
         String recordId = record.getId();
 
@@ -119,8 +126,9 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     public List<EvaluationRecords> listAnalysisResult(HttpSession session) {
         String userId = (String) session.getAttribute("uid");
-        return recordService.list(new LambdaUpdateWrapper<EvaluationRecords>()
-                .eq(EvaluationRecords::getUserId, userId));
+        return recordService.list(new LambdaQueryWrapper<EvaluationRecords>()
+                .eq(EvaluationRecords::getUserId, userId)
+                .orderByDesc(EvaluationRecords::getCreatedAt));
     }
 
     @Override
@@ -145,10 +153,28 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     @Override
     public void reportView(String reportId, HttpServletResponse response) {
+        response.setContentType("text/html;charset=UTF-8");
+        // 校验支付状态
+        EvaluationRecords record = recordService.getById(reportId);
+        if (record == null || record.getPayStatus() == null || record.getPayStatus() != 1) {
+            // 未支付，返回弹窗提示页面
+            try (OutputStream out = response.getOutputStream()) {
+                String html = "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\">"
+                        + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                        + "<title>提示</title></head><body>"
+                        + "<script>alert('该报告尚未支付，请先完成支付后查看');"
+                        + "window.location.href='http://jia.szzxsw.cn/evaluationHistory';</script>"
+                        + "</body></html>";
+                out.write(html.getBytes("UTF-8"));
+            } catch (Exception exception) {
+                log.error("report view failed...", exception);
+            }
+            return;
+        }
+
         String fileName = "/data/report/" + reportId + ".html";
         // String fileName = "D:/" + reportId + ".html";
         File file = new File(fileName);
-        response.setContentType("text/html;charset=UTF-8");
         try (InputStream in = new FileInputStream(file);
              OutputStream out = response.getOutputStream()) {
             IOUtils.copy(in, out);

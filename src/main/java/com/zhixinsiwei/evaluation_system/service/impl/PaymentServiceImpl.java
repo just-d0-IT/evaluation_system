@@ -122,9 +122,11 @@ public class PaymentServiceImpl implements PaymentService {
         request.setMchid(WXPayConstants.MERCHANT_ID);   //商户id
         request.setDescription("智商测试国际版公众号支付"); //详情
         request.setNotifyUrl(WXPayConstants.NOTIFY_URL);    //回调
-        // 使用recordId作为订单号，方便回调时关联记录
-        log.info("使用recordId作为订单号：{}", recordId);
-        request.setOutTradeNo(recordId);
+        // 订单号使用 recordId + 时间戳（base36压缩），保证每次下单唯一且不超过微信32字符限制，
+        // 避免"请求重入参数不一致"；回调时以下划线前缀反查 recordId
+        String outTradeNo = recordId + "_" + Long.toString(System.currentTimeMillis(), 36);
+        log.info("生成订单号：{}（recordId：{}）", outTradeNo, recordId);
+        request.setOutTradeNo(outTradeNo);
         PrepayWithRequestPaymentResponse response = jsService.prepayWithRequestPayment(request);
         log.info("JSApi支付参数：{}，响应：{}", request, response);
 
@@ -150,11 +152,17 @@ public class PaymentServiceImpl implements PaymentService {
             Transaction transaction = parser.parse(requestParam, Transaction.class);
             // 校验交易状态
             if (Transaction.TradeStateEnum.SUCCESS.equals(transaction.getTradeState())) {
-                // 支付成功，outTradeNo即为recordId
-                String recordId = transaction.getOutTradeNo();
-                log.info("支付成功，recordId：{}", recordId);
+                // 支付成功，outTradeNo格式为 recordId_时间戳，取下划线前缀反查recordId
+                String outTradeNo = transaction.getOutTradeNo();
+                String recordId = outTradeNo.contains("_") ? outTradeNo.split("_")[0] : outTradeNo;
+                log.info("支付成功，outTradeNo：{}，recordId：{}", outTradeNo, recordId);
                 EvaluationRecords record = recordService.getById(recordId);
                 if (record != null) {
+                    // 幂等处理：已支付则直接返回成功，避免重复更新（微信可能重复推送通知）
+                    if (record.getPayStatus() != null && record.getPayStatus() == 1) {
+                        log.info("记录已支付，跳过更新，recordId：{}", recordId);
+                        return 0;
+                    }
                     // 校验金额是否一致（微信回调金额单位为分，需转换对比）
                     int wxAmount = transaction.getAmount().getTotal();
                     int dbAmount = new BigDecimal(record.getPayPrice()).multiply(new BigDecimal("100")).intValue();
